@@ -1,35 +1,52 @@
-package config
+package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/joho/godotenv"
+
+	"pdmt-ticketing/config"
+	"pdmt-ticketing/routes"
 )
 
-var DB *gorm.DB
-
-func ConnectDB() {
-	dsn := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Jakarta",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-	)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-	})
-
-	if err != nil {
-		log.Fatal("Gagal koneksi ke database: ", err)
+func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
-	log.Println("Koneksi database berhasil!")
-	DB = db
+	config.ConnectDB()
+
+	app := fiber.New(fiber.Config{
+		AppName: "PDMT Ticketing API v1.0",
+	})
+
+	app.Use(logger.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+	}))
+
+	app.Get("/", func(c fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "ok",
+			"message": "PDMT Ticketing API berjalan",
+		})
+	})
+
+	routes.SetupRoutes(app)
+
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server berjalan di port %s", port)
+	if err := app.Listen(":" + port); err != nil {
+		log.Fatal(err)
+	}
 }
